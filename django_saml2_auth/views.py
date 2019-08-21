@@ -106,8 +106,8 @@ def _get_saml_client(domain):
                 'allow_unsolicited': True,
                 'authn_requests_signed': False,
                 'logout_requests_signed': True,
-                'want_assertions_signed': True,
-                'want_response_signed': False,
+                'want_assertions_signed': settings.SAML2_AUTH.get('WANT_ASSERTIONS_SIGNED', False),
+                'want_response_signed': settings.SAML2_AUTH.get('WANT_RESPONSE_SIGNED', True)
             },
         },
     }
