@@ -178,12 +178,12 @@ def acs(r):
     if settings.SAML2_AUTH.get('GET_USERNAME_FROM_SUBJECT', False):
         try:
             user_name = authn_response.get_subject().text
-        except AttributeError:
-            logger.error('could not get subject value from authn response %s' % authn_response)
+        except (AttributeError, AssertionError) as exc:
+            logger.error('could not get subject value from authn response exc=%s' % exc)
     else:
         user_name = user_identity[settings.SAML2_AUTH.get('ATTRIBUTES_MAP', {}).get('username', 'UserName')][0]
     if user_name is None:
-        raise ValueError('could not get user email from authn response %s' % authn_response)
+        raise ValueError('could not get user email from authn response')
 
     try:
         user_email = user_identity[settings.SAML2_AUTH.get('ATTRIBUTES_MAP', {}).get('email', 'Email')][0]
