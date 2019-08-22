@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
 
+import logging
 
 from saml2 import (
     BINDING_HTTP_POST,
@@ -23,6 +24,8 @@ from django.http import HttpResponseRedirect
 from django.utils.http import is_safe_url
 
 from rest_auth.utils import jwt_encode
+
+logger = logging.getLogger(__name__)
 
 
 # default User or custom User. Now both will work.
@@ -171,10 +174,23 @@ def acs(r):
     if user_identity is None:
         return HttpResponseRedirect(get_reverse([denied, 'denied', 'django_saml2_auth:denied']))
 
-    user_email = user_identity[settings.SAML2_AUTH.get('ATTRIBUTES_MAP', {}).get('email', 'Email')][0]
-    user_name = user_identity[settings.SAML2_AUTH.get('ATTRIBUTES_MAP', {}).get('username', 'UserName')][0]
-    user_first_name = user_identity[settings.SAML2_AUTH.get('ATTRIBUTES_MAP', {}).get('first_name', 'FirstName')][0]
-    user_last_name = user_identity[settings.SAML2_AUTH.get('ATTRIBUTES_MAP', {}).get('last_name', 'LastName')][0]
+    user_name, user_email, user_first_name, user_last_name = None, None, None, None
+    if settings.SAML2_AUTH.get('GET_USERNAME_FROM_SUBJECT', False):
+        try:
+            user_name = authn_response.get_subject().text
+        except AttributeError:
+            logger.error('could not get subject value from authn response %s' % authn_response)
+    else:
+        user_name = user_identity[settings.SAML2_AUTH.get('ATTRIBUTES_MAP', {}).get('username', 'UserName')][0]
+    if user_name is None:
+        raise ValueError('could not get user email from authn response %s' % authn_response)
+
+    try:
+        user_email = user_identity[settings.SAML2_AUTH.get('ATTRIBUTES_MAP', {}).get('email', 'Email')][0]
+        user_first_name = user_identity[settings.SAML2_AUTH.get('ATTRIBUTES_MAP', {}).get('first_name', 'FirstName')][0]
+        user_last_name = user_identity[settings.SAML2_AUTH.get('ATTRIBUTES_MAP', {}).get('last_name', 'LastName')][0]
+    except (KeyError, IndexError) as exc:
+        logger.debug('could not get user info attributes from response %s exc= %s' % (authn_response, exc))
 
     target_user = None
     is_new_user = False
@@ -185,7 +201,7 @@ def acs(r):
             import_string(settings.SAML2_AUTH['TRIGGER']['BEFORE_LOGIN'])(user_identity)
     except User.DoesNotExist:
         new_user_should_be_created = settings.SAML2_AUTH.get('CREATE_USER', True)
-        if new_user_should_be_created:
+        if new_user_should_be_created and (user_email, user_first_name and user_last_name):
             target_user = _create_new_user(user_name, user_email, user_first_name, user_last_name)
             if settings.SAML2_AUTH.get('TRIGGER', {}).get('CREATE_USER', None):
                 import_string(settings.SAML2_AUTH['TRIGGER']['CREATE_USER'])(user_identity)
