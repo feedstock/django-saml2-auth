@@ -174,16 +174,9 @@ def acs(r):
     if user_identity is None:
         return HttpResponseRedirect(get_reverse([denied, 'denied', 'django_saml2_auth:denied']))
 
-    user_name = None
-    if settings.SAML2_AUTH.get('GET_USERNAME_FROM_SUBJECT', False):
-        try:
-            user_name = authn_response.get_subject().text
-        except (AttributeError, AssertionError) as exc:
-            logger.error('could not get subject value from authn response exc=%s' % exc)
-    else:
-        user_name = user_identity[settings.SAML2_AUTH.get('ATTRIBUTES_MAP', {}).get('username', 'UserName')][0]
+    user_name = authn_response.get_subject().text
     if user_name is None:
-        raise ValueError('could not get user email from authn response')
+        raise ValueError('could not get user email from authn response subject')
 
     target_user = None
     is_new_user = False
@@ -193,6 +186,7 @@ def acs(r):
         if settings.SAML2_AUTH.get('TRIGGER', {}).get('BEFORE_LOGIN', None):
             import_string(settings.SAML2_AUTH['TRIGGER']['BEFORE_LOGIN'])(user_identity)
     except User.DoesNotExist:
+        logger.info(f'not found user with {User.USERNAME_FIELD} {user_name}')
         new_user_should_be_created = settings.SAML2_AUTH.get('CREATE_USER', True)
         if new_user_should_be_created:
             user_email, user_first_name, user_last_name = None, None, None
