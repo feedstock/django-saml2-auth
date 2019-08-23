@@ -199,7 +199,7 @@ def acs(r):
                     settings.SAML2_AUTH.get('ATTRIBUTES_MAP', {}).get('last_name', 'LastName')
                 ][0]
             except (KeyError, IndexError) as exc:
-                logger.debug('could not get user info attributes from response %s exc= %s' % (authn_response, exc))
+                logger.error('could not get user info attributes from response exc= %s' % exc)
             if user_email and user_first_name and user_last_name:
                 target_user = _create_new_user(user_name, user_email, user_first_name, user_last_name)
                 if settings.SAML2_AUTH.get('TRIGGER', {}).get('CREATE_USER', None):
