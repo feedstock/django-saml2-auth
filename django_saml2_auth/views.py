@@ -174,9 +174,18 @@ def acs(r):
     if user_identity is None:
         return HttpResponseRedirect(get_reverse([denied, 'denied', 'django_saml2_auth:denied']))
 
-    user_name = authn_response.get_subject().text
+    user_name = None
+    try:
+        user_name = user_identity[settings.SAML2_AUTH.get('ATTRIBUTES_MAP', {}).get('username', 'UserName')][0]
+    except (IndexError, KeyError):
+        logger.info('could not get username from attributes')
     if user_name is None:
-        raise ValueError('could not get user email from authn response subject')
+        try:
+            user_name = authn_response.get_subject().text
+        except AttributeError:
+            logger.info('could not get user name from subject')
+    if user_name is None:
+        raise ValueError('could not get username from authn response')
 
     target_user = None
     is_new_user = False
