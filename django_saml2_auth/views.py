@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
 
+import logging
 
 from saml2 import (
     BINDING_HTTP_POST,
@@ -23,6 +24,8 @@ from django.http import HttpResponseRedirect
 from django.utils.http import is_safe_url
 
 from rest_auth.utils import jwt_encode
+
+logger = logging.getLogger(__name__)
 
 
 # default User or custom User. Now both will work.
@@ -72,6 +75,18 @@ def get_reverse(objs):
         except:
             pass
     raise Exception('We got a URL reverse issue: %s. This is a known issue but please still submit a ticket at https://github.com/fangli/django-saml2-auth/issues/new' % str(objs))
+
+
+def get_identity_attr(user_identity, key):
+    """
+    user_identity: a dict with format {str: list}
+    key: string
+
+    returns string or None
+    """
+    if key in user_identity and isinstance(user_identity.get(key), list):
+        return user_identity[key][0]
+    return None
 
 
 def _get_metadata():
@@ -171,10 +186,19 @@ def acs(r):
     if user_identity is None:
         return HttpResponseRedirect(get_reverse([denied, 'denied', 'django_saml2_auth:denied']))
 
-    user_email = user_identity[settings.SAML2_AUTH.get('ATTRIBUTES_MAP', {}).get('email', 'Email')][0]
-    user_name = user_identity[settings.SAML2_AUTH.get('ATTRIBUTES_MAP', {}).get('username', 'UserName')][0]
-    user_first_name = user_identity[settings.SAML2_AUTH.get('ATTRIBUTES_MAP', {}).get('first_name', 'FirstName')][0]
-    user_last_name = user_identity[settings.SAML2_AUTH.get('ATTRIBUTES_MAP', {}).get('last_name', 'LastName')][0]
+    user_name = get_identity_attr(
+        user_identity,
+        settings.SAML2_AUTH.get('ATTRIBUTES_MAP', {}).get('username', 'UserName')
+    )
+    if user_name is None:
+        logger.info('could not get username from attributes, trying subject')
+        subj = authn_response.get_subject()
+        if subj and subj.c_tag == 'NameID' and 'emailAddress' in subj.format:
+            user_name = subj.text
+        else:
+            logger.info('could not get user name from subject')
+    if user_name is None:
+        raise ValueError('could not get username from authn response')
 
     target_user = None
     is_new_user = False
@@ -184,12 +208,29 @@ def acs(r):
         if settings.SAML2_AUTH.get('TRIGGER', {}).get('BEFORE_LOGIN', None):
             import_string(settings.SAML2_AUTH['TRIGGER']['BEFORE_LOGIN'])(user_identity)
     except User.DoesNotExist:
+        logger.info(f'could not find user with {User.USERNAME_FIELD} {user_name}')
         new_user_should_be_created = settings.SAML2_AUTH.get('CREATE_USER', True)
         if new_user_should_be_created:
-            target_user = _create_new_user(user_name, user_email, user_first_name, user_last_name)
-            if settings.SAML2_AUTH.get('TRIGGER', {}).get('CREATE_USER', None):
-                import_string(settings.SAML2_AUTH['TRIGGER']['CREATE_USER'])(user_identity)
-            is_new_user = True
+            user_email = get_identity_attr(
+                user_identity,
+                settings.SAML2_AUTH.get('ATTRIBUTES_MAP', {}).get('email', 'Email')
+            )
+            user_first_name = get_identity_attr(
+                user_identity,
+                settings.SAML2_AUTH.get('ATTRIBUTES_MAP', {}).get('first_name', 'FirstName')
+            )
+            user_last_name = get_identity_attr(
+                user_identity,
+                settings.SAML2_AUTH.get('ATTRIBUTES_MAP', {}).get('last_name', 'LastName')
+            )
+            if user_email and user_first_name and user_last_name:
+                target_user = _create_new_user(user_name, user_email, user_first_name, user_last_name)
+                if settings.SAML2_AUTH.get('TRIGGER', {}).get('CREATE_USER', None):
+                    import_string(settings.SAML2_AUTH['TRIGGER']['CREATE_USER'])(user_identity)
+                is_new_user = True
+            else:
+                logger.warning('could not create new user with email=%s, first name=%s last name=%s',
+                               user_email, user_first_name, user_last_name)
         else:
             return HttpResponseRedirect(get_reverse([denied, 'denied', 'django_saml2_auth:denied']))
 
