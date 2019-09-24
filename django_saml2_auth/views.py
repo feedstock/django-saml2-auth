@@ -269,7 +269,7 @@ def signin(r):
         import urllib.parse as _urlparse
         from urllib.parse import unquote
     next_url = r.GET.get('next', _default_next_url())
-    logger.info("got next_url=%s from request %s", r, next_url)
+    logger.info("got next_url=%s from request %s", next_url, r.__dict__)
 
     try:
         if 'next=' in unquote(next_url):
