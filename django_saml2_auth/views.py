@@ -269,11 +269,13 @@ def signin(r):
         import urllib.parse as _urlparse
         from urllib.parse import unquote
     next_url = r.GET.get('next', _default_next_url())
+    logger.info("got next_url=%s from request %s", r, next_url)
 
     try:
         if 'next=' in unquote(next_url):
             next_url = _urlparse.parse_qs(_urlparse.urlparse(unquote(next_url)).query)['next'][0]
     except:
+        logger.info("could not get next_url when next= is present")
         next_url = r.GET.get('next', _default_next_url())
 
     # Only permit signin requests where the next_url is a safe URL
