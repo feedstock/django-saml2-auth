@@ -204,7 +204,13 @@ def acs(r):
     is_new_user = False
 
     try:
-        target_user = User.objects.get(**{User.USERNAME_FIELD: user_name})
+        username_field = [f for f in User._meta.fields if f.name == User.USERNAME_FIELD][0]
+        is_email = [v for v in username_field.validators if v.__class__.__name__ == 'EmailValidator']
+        target_user_query = (
+            {User.USERNAME_FIELD: user_name} if not is_email
+            else {f'{User.USERNAME_FIELD}__iexact': user_name}
+        )
+        target_user = User.objects.get(**target_user_query)
         if settings.SAML2_AUTH.get('TRIGGER', {}).get('BEFORE_LOGIN', None):
             import_string(settings.SAML2_AUTH['TRIGGER']['BEFORE_LOGIN'])(user_identity)
     except User.DoesNotExist:
