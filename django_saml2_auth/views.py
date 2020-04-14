@@ -173,6 +173,11 @@ def acs(r):
     saml_client = _get_saml_client(get_current_domain(r))
     resp = r.POST.get('SAMLResponse', None)
     next_url = r.session.get('login_next_url', _default_next_url())
+    logger.info(
+        'got login_next_url from session %s: %s',
+        r.session.session_key,
+        next_url
+    )
 
     if not resp:
         return HttpResponseRedirect(get_reverse([denied, 'denied', 'django_saml2_auth:denied']))
@@ -279,7 +284,8 @@ def signin(r):
     try:
         if 'next=' in unquote(next_url):
             next_url = _urlparse.parse_qs(_urlparse.urlparse(unquote(next_url)).query)['next'][0]
-    except:
+    except Exception as err:
+        logger.exception('cannot parse next parameter: %s', err)
         next_url = r.GET.get('next', _default_next_url())
 
     # Only permit signin requests where the next_url is a safe URL
@@ -292,6 +298,11 @@ def signin(r):
         return HttpResponseRedirect(get_reverse([denied, 'denied', 'django_saml2_auth:denied']))
 
     r.session['login_next_url'] = next_url
+    logger.info(
+        'stored loging_next_url on session %s: %s',
+        r.session.session_key,
+        next_url
+    )
 
     saml_client = _get_saml_client(get_current_domain(r))
     _, info = saml_client.prepare_for_authenticate()
