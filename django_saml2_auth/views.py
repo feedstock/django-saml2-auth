@@ -199,6 +199,8 @@ def acs(r):
         logger.info('could not get username from attributes, trying subject')
         subj = authn_response.get_subject()
         if subj and subj.c_tag == 'NameID':
+            if not subj.format:
+                logger.warning('no subject format')
             if subj.format and 'emailAddress' not in subj.format:
                 logger.warning(f'emailAddress is not found in subject format. the format is: {subj.format}')
             user_name = subj.text
