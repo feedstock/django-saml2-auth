@@ -191,7 +191,7 @@ def acs(r):
     if user_identity is None:
         return HttpResponseRedirect(get_reverse([denied, 'denied', 'django_saml2_auth:denied']))
 
-    logger.info(f'user identity: {user_identity}')
+    logger.debug(f'user identity: {user_identity}')
     logger.debug(f'settings.SAML2_AUTH: {settings.SAML2_AUTH}')
 
     user_name = get_identity_attr(
