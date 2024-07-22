@@ -276,6 +276,8 @@ How to Contribute
 Release Log
 ===========
 
+2.2.2: Change is_safe_url usage to url_has_allowed_host_and_scheme as is_safe_url has been depricated
+
 2.2.1: Fixed is_safe_url parameters issue for django 2.1
 
 2.2.0: ADFS SAML compatibility and fixed some issue for Django2.0
